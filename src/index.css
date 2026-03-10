@@ -1,0 +1,14 @@
+@import "tailwindcss";
+:root {
+  --bg-color: #007DBA;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  /* Optional for smoother font rendering */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+html {
+  scroll-behavior: smooth;
+}
