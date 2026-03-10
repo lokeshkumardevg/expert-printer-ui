@@ -45,6 +45,11 @@ function Header() {
     }
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
+      const maxScrollY = document.documentElement.scrollHeight - window.innerHeight;
+      
+      // Ignore elastic overscroll on macOS/mobile at top or bottom
+      if (currentScrollY < 0 || currentScrollY > maxScrollY) return;
+
       const isDesktop = window.innerWidth >= 1024;
       if (!isDesktop || currentScrollY < 50) setShowHeader(true);
       else if (currentScrollY > lastScrollY.current) setShowHeader(false);

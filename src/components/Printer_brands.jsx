@@ -6,51 +6,51 @@ const PLACEHOLDER_IMG = "https://images-cdn.ubuy.co.in/67cdb26d5af3ca779640523e-
 // ─── Sample data — structure matches your Python scraper output ───────────────
 const scrapedPrinters = [
   {
-    id: "hp-officejet-pro-8139e-1",
-    name: "HP OfficeJet Pro 8139e Wireless All-in-One Printer with 1 Full Year Instant Ink with HP+, AI-enabled",
-    price: 349.0,
-    original_price: 499.0,
-    image: PLACEHOLDER_IMG,
+    id: "hp-officejet-pro-8025e",
+    name: "HP OfficeJet Pro 8025e Wireless Color All-in-One Printer",
+    price: 159.0,
+    original_price: 229.0,
+    image: "/hp_officejet.png",
     in_stock: true,
   },
   {
-    id: "hp-officejet-pro-8139e-2",
-    name: "HP OfficeJet Pro 8139e Wireless All-in-One Printer with 1 Full Year Instant Ink with HP+, AI-enabled",
-    price: 349.0,
-    original_price: 499.0,
-    image: PLACEHOLDER_IMG,
+    id: "hp-deskjet-2755e",
+    name: "HP DeskJet 2755e Wireless Color All-in-One Printer",
+    price: 84.99,
+    original_price: 109.99,
+    image: "/hp_deskjet.png",
     in_stock: true,
   },
   {
-    id: "hp-officejet-pro-8139e-3",
-    name: "HP OfficeJet Pro 8139e Wireless All-in-One Printer with 1 Full Year Instant Ink with HP+, AI-enabled",
-    price: 349.0,
-    original_price: 499.0,
-    image: PLACEHOLDER_IMG,
+    id: "hp-envy-6055e",
+    name: "HP ENVY 6055e All-in-One Wireless Color Printer",
+    price: 129.99,
+    original_price: 169.99,
+    image: "/hp_envy.png",
     in_stock: true,
   },
   {
-    id: "hp-officejet-pro-8139e-4",
-    name: "HP OfficeJet Pro 8139e Wireless All-in-One Printer with 1 Full Year Instant Ink with HP+, AI-enabled",
-    price: 349.0,
-    original_price: 499.0,
-    image: PLACEHOLDER_IMG,
+    id: "hp-laserjet-pro-m15w",
+    name: "HP LaserJet Pro M15w Wireless Monochrome Printer",
+    price: 189.0,
+    original_price: 219.0,
+    image: "/hp_laserjet.png",
     in_stock: true,
   },
   {
-    id: "hp-officejet-pro-8139e-5",
-    name: "HP OfficeJet Pro 8139e Wireless All-in-One Printer with 1 Full Year Instant Ink with HP+, AI-enabled",
+    id: "hp-smart-tank-plus-551",
+    name: "HP Smart Tank Plus 551 Wireless All-in-One Ink Tank Printer",
     price: 349.0,
-    original_price: 499.0,
-    image: PLACEHOLDER_IMG,
+    original_price: 399.0,
+    image: "/hp_smarttank.png",
     in_stock: true,
   },
   {
-    id: "hp-officejet-pro-8139e-6",
-    name: "HP OfficeJet Pro 8139e Wireless All-in-One Printer with 1 Full Year Instant Ink with HP+, AI-enabled",
-    price: 349.0,
-    original_price: 499.0,
-    image: PLACEHOLDER_IMG,
+    id: "hp-color-laserjet-pro-m283fdw",
+    name: "HP Color LaserJet Pro M283fdw Wireless All-in-One Laser Printer",
+    price: 499.0,
+    original_price: 549.0,
+    image: "/hp_color_laserjet.png",
     in_stock: true,
   },
 ];
@@ -218,7 +218,7 @@ function PrinterCard({ product }) {
         {
           !inWishlist ? (
             <button
-            style={{ backgroundColor: "var(--bg-color)" }}
+              style={{ backgroundColor: "var(--bg-color)" }}
               onClick={handleAdd}
               className="w-full h-12 rounded-lg hover:opacity-90 text-white text-sm font-medium transition-colors duration-200 cursor-pointer "
             >
@@ -227,7 +227,7 @@ function PrinterCard({ product }) {
           ) : (
             <div className="flex items-center gap-2 w-full" >
               <button
-              style={{ backgroundColor: "var(--bg-color)" }}
+                style={{ backgroundColor: "var(--bg-color)" }}
                 onClick={handleDecrease}
                 className="flex-[0.8] h-11 rounded-lg hover:opacity-90 text-white text-xl font-bold flex items-center justify-center transition-colors duration-200 cursor-pointer"
               >
@@ -237,7 +237,7 @@ function PrinterCard({ product }) {
                 {String(quantity).padStart(2, "0")}
               </div>
               < button
-              style={{ backgroundColor: "var(--bg-color)" }}
+                style={{ backgroundColor: "var(--bg-color)" }}
                 onClick={handleIncrease}
                 className="flex-[0.8] h-11 hover:opacity-90 rounded-lg text-white text-xl font-bold flex items-center justify-center transition-colors duration-200 cursor-pointer"
               >
