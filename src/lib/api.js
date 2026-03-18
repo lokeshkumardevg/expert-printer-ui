@@ -38,19 +38,23 @@ export class AuthError extends Error {
 // ── Authenticated fetch ───────────────────────────────────────────────────────
 export async function apiFetch(path, options = {}) {
   // Guard: if no real JWT, throw immediately without making the HTTP call.
-  // This stops the 401 flood when running with the static fallback token.
-  if (!hasRealToken()) {
+  // EXCEPT for the login path.
+  if (path !== "/api/auth/login" && !hasRealToken()) {
     throw new AuthError("No valid token — running in fallback mode");
   }
 
   const token = getToken();
-  const res   = await fetch(`${API_BASE}${path}`, {
+  const headers = {
+    "Content-Type": "application/json",
+    ...options.headers,
+  };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_BASE}${path}`, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization:  `Bearer ${token}`,
-      ...options.headers,
-    },
+    headers,
   });
 
   // 401 = token expired or invalid

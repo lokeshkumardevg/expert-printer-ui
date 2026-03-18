@@ -83,11 +83,11 @@ function Aboutus() {
                         </div>
 
                         <p className="text-gray-700 leading-relaxed text-sm sm:text-base">
-                            Dealing with printer errors, slow performance, or constant connection issues? You don’t have to figure it out alone. Our expert printer support services are designed to quickly diagnose problems, fix errors, and keep your printer running smoothly—without the stress.
+                            Dealing with printer errors, slow performance, or constant connection issues? You don’t have to figure it out alone. Our certified técnicos provide instant online support to diagnose problems, fix driver errors, and keep your office running smoothly.
                             <br />
-                            Whether it’s setup issues, driver problems, paper jams, or network errors, our skilled technicians provide clear, effective solutions tailored to your printer model. We focus on fast response, accurate troubleshooting, and long-term reliability so you can get back to work without interruptions.
+                            Whether it’s setup guidance, wireless configuration, or hardware troubleshooting, TechForCall offers clear, effective solutions for all major printer brands. We focus on fast response times and long-term reliability so you can get back to work without interruptions.
                             <br /><br />
-                            Contact Expert Printer Support at +1-702-555-0122 for dependable, straightforward assistance whenever you need it.
+                            Contact TechForCall Support at <span className="font-bold">+1 (844) PRINTER-HELP</span> for dependable technical assistance whenever you need it.
                         </p>
                         <div style={{ backgroundColor: "var(--bg-color)" }} className="w-40 sm:w-60 lg:w-80 h-1"></div>
                     </div>

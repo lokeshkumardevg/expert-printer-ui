@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import ContactPage from "./ContactPage";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -12,6 +12,8 @@ function Header() {
   const [openContact, setOpenContact] = useState(false);
   const [wishlistOpen, setWishlistOpen] = useState(false);
   const lastScrollY = useRef(0);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // Live badge count
   const wishlistCount = useWishlistCount();
@@ -85,6 +87,10 @@ function Header() {
   }, []);
 
   const scrollToSection = (id) => {
+    if (location.pathname !== "/") {
+       navigate(`/#${id}`);
+       return;
+    }
     const element = document.getElementById(id);
     if (!element) return;
     const offset = 82;
@@ -106,6 +112,20 @@ function Header() {
     requestAnimationFrame(animation);
     setMobileMenuOpen(false);
   };
+
+  useEffect(() => {
+    if (location.hash && location.pathname === "/") {
+       const id = location.hash.replace("#", "");
+       setTimeout(() => {
+         const element = document.getElementById(id);
+         if (element) {
+            const offset = 82;
+            const target = element.getBoundingClientRect().top + window.scrollY - offset;
+            window.scrollTo({ top: target, behavior: "smooth" });
+         }
+       }, 500); // Increased timeout for better cross-page reliability
+    }
+  }, [location.hash, location.pathname]);
 
   const closeWishlist = useCallback(() => setWishlistOpen(false), []);
 
@@ -286,12 +306,12 @@ function Header() {
                       {link.name}
                     </NavLink>
                   ) : (
-                    <NavLink
+                    <button
                       onClick={() => scrollToSection(link.name.toLowerCase())}
-                      className="block w-full py-4 text-xl text-center font-medium transition-colors duration-200 text-white hover:text-[#007DBA]"
+                      className="block w-full py-4 text-xl text-center font-medium transition-colors duration-200 text-white hover:text-[#007DBA] cursor-pointer"
                     >
                       {link.name}
-                    </NavLink>
+                    </button>
                   )}
                 </div>
               ))}

@@ -11,23 +11,37 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import DashboardLayout from "../DashboardLayout";
 import { Skeleton } from "../Shared";
 import Icon from "../Icon";
-import { apiFetch, AuthError } from "../../../lib/api";
+import { apiFetch, AuthError, getUser } from "../../../lib/api";
 import { useChat } from "../../../hooks/useChat";
-import { getUser } from "../../../lib/api";
+import { useAgentNotifications } from "../../../hooks/useAgentNotifications";
 import { API_ENABLED, ADMIN_NAV, FALLBACK_AREA_DATA, FALLBACK_BAR_DATA } from "../../../lib/constants";
 
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
 function fmtDate(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
-  return `${d.toLocaleDateString()}\n${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+  return d.toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function fmtTime(iso) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function fmtGroupDate(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const today = new Date();
+  if (d.toDateString() === today.toDateString()) return "Today";
+  const yesterday = new Date(); yesterday.setDate(today.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return d.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
 // Map raw API stats object → stat card array
 function buildStatCards(raw) {
   return [
     { label: "Total Leads",     value: String(raw.total_leads   ?? 0), change: "All time",        positive: true,  icon: "list",        accent: "bg-blue-50 text-blue-500"      },
-    { label: "Active Chats",    value: String(raw.active_chats  ?? 0), change: "Currently open",  positive: true,  icon: "chat",        accent: "bg-orange-50 text-orange-500"  },
+    { label: "Active Chats",    value: String(raw.active_chats  ?? 0), change: `${raw.waiting_chats ?? 0} waiting · ${raw.offline_chats ?? 0} inactive`, positive: true,  icon: "chat",        accent: "bg-orange-50 text-orange-500"  },
     { label: "Resolved Issues", value: String(raw.resolved      ?? 0), change: "Total resolved",  positive: true,  icon: "checkCircle", accent: "bg-emerald-50 text-emerald-500" },
     { label: "Total Agents",    value: String(raw.total_agents  ?? 0), change: "Registered",      positive: true,  icon: "users",       accent: "bg-purple-50 text-purple-500"  },
   ];
@@ -161,11 +175,11 @@ function StatusDropdown({ status, onChange }) {
 }
 
 // ─── MODAL ───────────────────────────────────────────────────────────────────
-function Modal({ children, onClose }) {
+function Modal({ children, onClose, wide = false }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose}/>
-      <div className="relative bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm mx-4">
+      <div className={`relative bg-white rounded-2xl shadow-2xl p-8 w-full ${wide ? 'max-w-4xl' : 'max-w-sm'} mx-4 overflow-y-auto max-h-[92vh] transition-all`}>
         {children}
       </div>
     </div>
@@ -239,11 +253,24 @@ function DashboardView({ stats, areaData, barData, leads, loading, loadingLeads,
 }
 
 // ─── LIVE CHATS VIEW ──────────────────────────────────────────────────────────
-const CPILL = { active:"bg-gray-900 text-white", waiting:"bg-blue-100 text-blue-700", resolved:"bg-gray-100 text-gray-500" };
+const CPILL = { 
+  active:  "bg-blue-600 text-white border-blue-500", 
+  waiting: "bg-orange-50 text-orange-600 border-orange-100", 
+  resolved: "bg-emerald-50 text-emerald-600 border-emerald-100",
+  offline: "bg-gray-100 text-gray-400 border-gray-200"
+};
 
 function AdminChatWindow({ chat }) {
   const currentUser = getUser();
-  const { messages, connected, sendMessage } = useChat({
+  const { 
+    messages, 
+    connected, 
+    otherIsTyping,
+    sendMessage, 
+    sendImage, 
+    startTyping,
+    stopTyping 
+  } = useChat({
     chatId: chat?.id,
     userId: `admin_${currentUser?.id || "admin"}`,
     role:   "admin",
@@ -251,12 +278,21 @@ function AdminChatWindow({ chat }) {
   const [msg, setMsg] = useState("");
   const bottomRef     = useRef(null);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "auto" }); }, [messages]);
 
   const send = () => {
     if (!msg.trim()) return;
     sendMessage(msg.trim());
     setMsg("");
+    stopTyping();
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => sendImage(reader.result);
+    reader.readAsDataURL(file);
   };
 
   if (!chat) return (
@@ -283,54 +319,118 @@ function AdminChatWindow({ chat }) {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 bg-gray-50/30">
+      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6 bg-gray-50/30">
         {messages.length === 0 && (
-          <div className="text-center text-xs text-gray-400 py-8">No messages yet.</div>
+          <div className="text-center text-xs text-gray-400 py-8 italic">No messages yet. Initializing secure tunnel...</div>
         )}
-        {messages.map((m,idx)=>(
-          <div key={m.id||idx}>
-            {m.from==="divider"&&<div className="text-center text-xs text-gray-400 py-1">— {m.text} —</div>}
-            {m.from==="bot"&&(
-              <div className="flex justify-end">
-                <div className="max-w-sm">
-                  <p className="text-xs text-gray-400 text-right mb-1">ChatBot</p>
-                  <div className="bg-white border border-gray-100 shadow-sm text-gray-700 text-sm rounded-2xl rounded-tr-sm px-4 py-3">{m.text}</div>
+        {(() => {
+          const groups = [];
+          messages.forEach(m => {
+            const date = new Date(m.created_at || Date.now()).toDateString();
+            if (!groups.length || groups[groups.length - 1].date !== date) {
+              groups.push({ date, display: fmtGroupDate(m.created_at || Date.now()), items: [] });
+            }
+            groups[groups.length - 1].items.push(m);
+          });
+          
+          return groups.map(group => (
+            <div key={group.date} className="space-y-4">
+              <div className="flex items-center gap-4 py-2">
+                <div className="flex-1 h-px bg-gray-100"/>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-white px-2 py-0.5 rounded-full border border-gray-100">{group.display}</span>
+                <div className="flex-1 h-px bg-gray-100"/>
+              </div>
+              
+              {group.items.map((m, idx) => (
+                <div key={m.id || idx}>
+                  {m.from === "divider" && (
+                     <div className="flex items-center gap-3 py-1 bg-blue-50/50 rounded-lg px-3 border border-blue-100/30">
+                       <span className="text-[10px] text-blue-500 font-medium">System Alert: {m.text}</span>
+                     </div>
+                  )}
+                  {m.from === "bot" && (
+                    <div className="flex justify-end gap-2 group/msg">
+                      <div className="max-w-sm">
+                        <p className="text-[10px] text-gray-400 text-right mb-1 font-medium">Bot · {fmtTime(m.created_at)}</p>
+                        <div className="bg-white border border-gray-200 text-gray-700 text-sm rounded-2xl rounded-tr-sm px-4 py-3 shadow-sm group-hover/msg:shadow-md transition-shadow">
+                          {m.type === "image" ? (
+                            <img src={m.text} alt="Shared" className="max-w-full rounded-lg cursor-zoom-in" onClick={() => window.open(m.text)} />
+                          ) : m.text}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {m.from === "customer" && (
+                    <div className="flex flex-col items-start gap-1 group/msg">
+                      <p className="text-[10px] text-blue-500 font-bold uppercase tracking-wider px-1">{chat.customer} · {fmtTime(m.created_at)}</p>
+                      <div className="bg-blue-500 text-white text-sm rounded-2xl rounded-tl-sm px-4 py-3 max-w-sm shadow-sm group-hover/msg:shadow-md transition-shadow">
+                        {m.type === "image" ? (
+                          <img src={m.text} alt="Shared" className="max-w-full rounded-lg cursor-zoom-in" onClick={() => window.open(m.text)} />
+                        ) : m.text}
+                      </div>
+                    </div>
+                  )}
+                  {(m.from === "agent" || m.from === "admin") && (
+                    <div className="flex justify-end gap-2 group/msg">
+                      <div className="max-w-sm">
+                        <p className="text-[10px] text-gray-400 text-right mb-1 font-medium">You ({m.from}) · {fmtTime(m.created_at)}</p>
+                        <div className="bg-white border border-blue-200 text-gray-700 text-sm rounded-2xl rounded-tr-sm px-4 py-3 shadow-sm group-hover/msg:shadow-md transition-shadow ring-1 ring-blue-50">
+                          {m.type === "image" ? (
+                            <img src={m.text} alt="Shared" className="max-w-full rounded-lg cursor-zoom-in" onClick={() => window.open(m.text)} />
+                          ) : m.text}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
-            {m.from==="customer"&&(
-              <div className="flex flex-col items-start">
-                <p className="text-xs text-blue-500 font-semibold mb-1">{chat.customer}</p>
-                <div className="bg-blue-500 text-white text-sm rounded-2xl rounded-tl-sm px-4 py-3 max-w-sm">{m.text}</div>
-              </div>
-            )}
-            {(m.from==="agent"||m.from==="admin")&&(
-              <div className="flex justify-end">
-                <div className="max-w-sm">
-                  <p className="text-xs text-gray-400 text-right mb-1">{m.from==="admin"?"Admin":"Agent"}</p>
-                  <div className="bg-white border border-gray-100 shadow-sm text-gray-700 text-sm rounded-2xl rounded-tr-sm px-4 py-3">{m.text}</div>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
+              ))}
+            </div>
+          ));
+        })()}
         <div ref={bottomRef}/>
       </div>
 
       {/* Input */}
-      <div className="px-5 py-3 border-t border-gray-100 flex items-center gap-3 bg-white">
-        <input value={msg} onChange={e=>setMsg(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()}
-          className="flex-1 text-sm border border-gray-200 rounded-xl px-4 py-2.5 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-          placeholder="Type a message as admin..."/>
-        <button onClick={send} className="bg-blue-500 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-600 transition-colors">
-          Send
-        </button>
+      <div className="p-4 border-t border-gray-100 bg-white">
+        {otherIsTyping && (
+          <div className="flex items-center gap-2 mb-2 px-1">
+             <div className="flex gap-1">
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" />
+             </div>
+             <span className="text-[10px] text-blue-500 font-medium">{chat.customer} is typing...</span>
+          </div>
+        )}
+        <div className="flex items-center gap-3">
+          <label className="p-2.5 rounded-xl bg-gray-50 text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-all cursor-pointer group">
+            <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
+            <span className="text-xl group-hover:scale-110 transition-transform">📎</span>
+          </label>
+          <input
+            value={msg}
+            onChange={(e)=>{
+              setMsg(e.target.value);
+              startTyping();
+            }}
+            onBlur={stopTyping}
+            placeholder="Type a message..."
+            className="flex-1 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+            onKeyDown={(e)=>e.key==="Enter"&&send()}
+          />
+          <button
+            onClick={send}
+            className="bg-blue-500 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-600 transition-colors shadow-sm shadow-blue-500/20 active:scale-95 transition-all"
+          >
+            Send
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-function LiveChatsView() {
+function LiveChatsView({ adminId }) {
   const [chats,    setChats]    = useState([]);
   const [selected, setSelected] = useState(null);
   const [loading,  setLoading]  = useState(true);
@@ -356,10 +456,39 @@ function LiveChatsView() {
     }
   }, []);
 
+  const { pendingChats: remotePending } = useAgentNotifications({
+    userId: adminId,
+    enabled: true
+  });
+
+  useEffect(() => {
+    // Only update if there's a real difference in remotePending to prevent jitter
+    if (remotePending.length) {
+      setChats(prev => {
+        let changed = false;
+        const next = [...prev];
+        remotePending.forEach(rc => {
+          const cid = rc.id || rc._id;
+          const idx = next.findIndex(c => (c.id || c._id) === cid);
+          if (idx === -1) {
+            next.unshift(rc);
+            changed = true;
+          } else {
+            // Check for actual status/agent change before updating state
+            if (next[idx].status !== rc.status || next[idx].agent !== rc.agent) {
+              next[idx] = { ...next[idx], ...rc };
+              changed = true;
+            }
+          }
+        });
+        return changed ? next : prev;
+      });
+    }
+  }, [remotePending]);
+
   useEffect(() => {
     fetchChats();
-    pollingRef.current = setInterval(fetchChats, 8000);
-    return () => clearInterval(pollingRef.current);
+    // Removed setInterval(8000) polling to prevent UI glitching/jitter
   }, [fetchChats]);
 
   return (
@@ -372,24 +501,60 @@ function LiveChatsView() {
             <Icon name="refresh" cls="w-3.5 h-3.5"/>
           </button>
         </div>
-        <div className="overflow-y-auto flex-1 divide-y divide-gray-50">
+        <div className="overflow-y-auto flex-1 h-full scroll-smooth select-none">
           {loading
-            ? [1,2,3].map(i=><div key={i} className="px-4 py-3 space-y-2"><Skeleton cls="h-3 w-24"/><Skeleton cls="h-3 w-16"/></div>)
+            ? [1,2,3].map(i=><div key={i} className="px-4 py-3 space-y-2 border-b border-gray-50"><Skeleton cls="h-3 w-24"/><Skeleton cls="h-3 w-16"/></div>)
             : error
-              ? <div className="px-4 py-8 text-center text-xs text-red-400">{error}</div>
+              ? <div className="px-4 py-8 text-center text-xs text-red-400 font-medium">{error}</div>
               : chats.length === 0
-                ? <div className="px-4 py-8 text-center text-xs text-gray-400">No chats yet</div>
-                : chats.map(c=>(
-                  <div key={c.id} onClick={()=>setSelected(c)}
-                    className={`px-4 py-3 cursor-pointer hover:bg-blue-50/50 transition-colors ${selected?.id===c.id?"bg-blue-50":""}`}>
-                    <div className="flex items-center justify-between mb-0.5">
-                      <p className="text-xs font-semibold text-gray-800 truncate">{c.customer}</p>
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${CPILL[c.status]||"bg-gray-100 text-gray-500"}`}>{c.status}</span>
-                    </div>
-                    <p className="text-xs text-gray-400">{c.printer||"—"}</p>
-                    <p className="text-xs text-gray-300 mt-0.5">{c.issue||"—"}</p>
+                ? <div className="px-4 py-12 text-center text-xs text-gray-400 italic flex flex-col items-center gap-2">
+                    <Icon name="chat" cls="w-10 h-10 text-gray-100 mb-1"/>
+                    No active conversations.
                   </div>
-                ))
+                : (() => {
+                    const sorted = [...chats].sort((a,b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+                    const groups = [];
+                    sorted.reverse().forEach(c => {
+                      const date = new Date(c.created_at || Date.now()).toDateString();
+                      if (!groups.length || groups[groups.length - 1].date !== date) {
+                        groups.push({ date, display: fmtGroupDate(c.created_at || Date.now()), items: [] });
+                      }
+                      groups[groups.length - 1].items.push(c);
+                    });
+                    
+                    return groups.map(group => (
+                      <div key={group.date} className="last:pb-4">
+                        <div className="px-4 py-2 bg-gray-50/80 border-y border-gray-100/50 sticky top-0 z-10 backdrop-blur-md">
+                          <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest">{group.display}</span>
+                        </div>
+                        {group.items.map(c => {
+                          const cid = c.id || c._id;
+                          const isActive = selected?.id === cid;
+                          return (
+                            <div key={cid} onClick={()=>setSelected(c)}
+                              className={`px-4 py-3.5 cursor-pointer hover:bg-blue-50/40 transition-all border-b border-gray-50 last:border-0 relative group
+                                ${isActive ? "bg-white ring-2 ring-inset ring-blue-500/10 shadow-[inset_4px_0_0_0_#3b82f6]" : ""}
+                                ${c.status === "offline" ? "opacity-60 grayscale-[0.3]" : ""}`}>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <p className={`text-xs font-bold truncate pr-2 transition-colors ${isActive ? "text-blue-600" : "text-gray-800"}`}>{c.customer}</p>
+                                <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md shadow-sm border ${CPILL[c.status]||CPILL.offline}`}>{c.status === "offline" ? "Inactive" : c.status}</span>
+                              </div>
+                              <div className="flex items-center justify-between text-[10px]">
+                                <p className="text-gray-400 font-medium truncate max-w-[120px]">{c.printer || "Inbound Query"}</p>
+                                <span className="text-gray-300 font-mono tracking-tighter">{fmtTime(c.created_at)}</span>
+                              </div>
+                              {c.status === "active" && c.agent && (
+                                <div className="mt-2 flex items-center gap-1.5 py-0.5 px-1.5 bg-emerald-50 rounded-md border border-emerald-100/50 w-fit">
+                                  <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]"/>
+                                  <span className="text-[9px] text-emerald-600 font-bold uppercase tracking-tight">Active: {c.agent}</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ));
+                  })()
           }
         </div>
       </div>
@@ -791,6 +956,136 @@ function AgentsView({ search, forceAdd, onAddClose }) {
   );
 }
 
+function BlogsView() {
+  const [blogs, setBlogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newBlog, setNewBlog] = useState({ title: '', category: 'Technical Support', image: '', content: '' });
+
+  const fetchBlogs = async () => {
+    try {
+      const data = await apiFetch("/api/admin/blogs");
+      setBlogs(data.blogs || []);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { fetchBlogs(); }, []);
+
+  const handleAdd = async (e) => {
+    e.preventDefault();
+    try {
+      await apiFetch("/api/admin/blogs", { method: 'POST', body: JSON.stringify(newBlog) });
+      setShowAdd(false);
+      setNewBlog({ title: '', category: 'Technical Support', image: '', content: '' });
+      fetchBlogs();
+    } catch (e) { alert(e.message); }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this blog?")) return;
+    try {
+      await apiFetch(`/api/admin/blogs/${id}`, { method: 'DELETE' });
+      fetchBlogs();
+    } catch (e) { alert(e.message); }
+  };
+
+  if (loading) return <div className="p-8 text-center text-gray-500">Loading blogs...</div>;
+
+  return (
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6">
+      <div className="flex justify-between items-center bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Articles & News</h2>
+          <p className="text-sm text-gray-500">Manage technical guides published on your website</p>
+        </div>
+        <button onClick={() => setShowAdd(true)} className="px-5 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-black transition cursor-pointer">
+          Add New Blog
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {blogs.map(b => (
+          <div key={b._id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm group">
+            <div className="h-40 bg-gray-100 relative">
+              <img src={b.image || "/blog_placeholder.png"} alt="" className="w-full h-full object-cover"/>
+              <button onClick={() => handleDelete(b._id)} className="absolute top-3 right-3 p-2 bg-white/90 rounded-lg text-red-500 opacity-0 group-hover:opacity-100 transition shadow-sm">
+                <Icon name="trash" cls="w-4 h-4"/>
+              </button>
+            </div>
+            <div className="p-5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-blue-500 bg-blue-50 px-2 py-1 rounded-md mb-2 inline-block">
+                {b.category}
+              </span>
+              <h3 className="font-bold text-gray-900 line-clamp-2 mb-2">{b.title}</h3>
+              <p className="text-xs text-gray-500 line-clamp-3 mb-4">{b.content.substring(0, 100)}...</p>
+              <div className="flex items-center justify-between text-[10px] text-gray-400">
+                <span>{new Date(b.created_at).toLocaleDateString()}</span>
+                <span>By {b.author}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {showAdd && (
+        <Modal onClose={() => setShowAdd(false)} wide={true}>
+          <div className="p-2">
+            <div className="flex justify-between items-center mb-8">
+               <div>
+                  <h3 className="text-2xl font-black text-gray-900 leading-tight">Create Technical Article</h3>
+                  <p className="text-sm text-gray-400 font-medium">Draft a new support guide or firmware update</p>
+               </div>
+               <button onClick={()=>setShowAdd(false)} className="text-gray-400 hover:text-black transition cursor-pointer">✕</button>
+            </div>
+
+            <form onSubmit={handleAdd} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div className="space-y-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-400 mb-1.5 uppercase tracking-[0.1em]">Article Title</label>
+                      <input required value={newBlog.title} onChange={e=>setNewBlog({...newBlog, title: e.target.value})} 
+                        className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:bg-white text-sm outline-none transition-all" 
+                        placeholder="How to Reset HP Printer Spooler"/>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-400 mb-1.5 uppercase tracking-[0.1em]">Category</label>
+                      <select value={newBlog.category} onChange={e=>setNewBlog({...newBlog, category: e.target.value})} 
+                        className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:bg-white text-sm outline-none transition-all">
+                        <option>Technical Support</option>
+                        <option>Setup Guides</option>
+                        <option>Troubleshooting</option>
+                        <option>News & Updates</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-400 mb-1.5 uppercase tracking-[0.1em]">Featured Image URL</label>
+                      <input value={newBlog.image} onChange={e=>setNewBlog({...newBlog, image: e.target.value})} 
+                        className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:bg-white text-sm outline-none transition-all" 
+                        placeholder="https://example.com/banner.png"/>
+                    </div>
+                    <div className="pt-4">
+                      <button type="submit" className="w-full py-4 bg-gray-900 text-white rounded-2xl text-sm font-bold hover:bg-black transition-all shadow-xl shadow-gray-200">
+                        Publish Technical Article
+                      </button>
+                    </div>
+                 </div>
+
+                 <div className="space-y-2">
+                    <label className="block text-[10px] font-bold text-gray-400 mb-1.5 uppercase tracking-[0.1em]">Full Content (Markdown)</label>
+                    <textarea required rows="14" value={newBlog.content} onChange={e=>setNewBlog({...newBlog, content: e.target.value})} 
+                      className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:bg-white text-sm outline-none transition-all resize-none" 
+                      placeholder="Write your detailed guide here... Supports markdown like # Heading, **Bold**, etc."></textarea>
+                 </div>
+              </div>
+            </form>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 export default function AdminDashboard({ user, onLogout }) {
   const [activeNav,    setActiveNav]    = useState("Dashboard");
@@ -846,6 +1141,7 @@ export default function AdminDashboard({ user, onLogout }) {
     "Leads":           ["Leads",            "Track and manage support requests"],
     "Website Content": ["Website Content",  "Edit live website fields stored in MongoDB"],
     "Agents":          ["Agents",           "Track and manage agents"],
+    "Blogs":           ["Blogs",            "Write and manage support articles"],
   };
   const [title, subtitle] = NAV_META[activeNav]||["Dashboard",""];
 
@@ -871,10 +1167,11 @@ export default function AdminDashboard({ user, onLogout }) {
       headerTitle={title} headerSub={subtitle} headerRight={headerRight}
     >
       {activeNav==="Dashboard"       && <DashboardView stats={stats} areaData={areaData} barData={barData} leads={leads} loading={loadingStats} loadingLeads={loadingLeads} onStatusChange={handleStatusChange}/>}
-      {activeNav==="Live Chats"      && <LiveChatsView/>}
+            {activeNav === "Live Chats" && <LiveChatsView adminId={user.id} />}
       {activeNav==="Leads"           && <LeadsView search={search}/>}
       {activeNav==="Website Content" && <WebsiteContentView search={search}/>}
       {activeNav==="Agents"          && <AgentsView search={search} forceAdd={showAddAgent} onAddClose={()=>setShowAddAgent(false)}/>}
+      {activeNav==="Blogs"           && <BlogsView/>}
     </DashboardLayout>
   );
 }

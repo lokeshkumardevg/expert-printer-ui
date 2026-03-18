@@ -12,6 +12,7 @@ const scrapedPrinters = [
     original_price: 229.0,
     image: "/hp_officejet.png",
     in_stock: true,
+    link: "https://www.hp.com/us-en/shop/pdp/hp-officejet-pro-8025e-all-in-one-printer",
   },
   {
     id: "hp-deskjet-2755e",
@@ -20,6 +21,7 @@ const scrapedPrinters = [
     original_price: 109.99,
     image: "/hp_deskjet.png",
     in_stock: true,
+    link: "https://www.hp.com/us-en/shop/pdp/hp-deskjet-2755e-all-in-one-printer",
   },
   {
     id: "hp-envy-6055e",
@@ -28,6 +30,7 @@ const scrapedPrinters = [
     original_price: 169.99,
     image: "/hp_envy.png",
     in_stock: true,
+    link: "https://www.hp.com/us-en/shop/pdp/hp-envy-6055e-all-in-one-printer",
   },
   {
     id: "hp-laserjet-pro-m15w",
@@ -36,6 +39,7 @@ const scrapedPrinters = [
     original_price: 219.0,
     image: "/hp_laserjet.png",
     in_stock: true,
+    link: "https://www.hp.com/us-en/shop/pdp/hp-laserjet-pro-m15w-printer",
   },
   {
     id: "hp-smart-tank-plus-551",
@@ -44,6 +48,7 @@ const scrapedPrinters = [
     original_price: 399.0,
     image: "/hp_smarttank.png",
     in_stock: true,
+    link: "https://www.hp.com/us-en/shop/pdp/hp-smart-tank-plus-551-wireless-all-in-one",
   },
   {
     id: "hp-color-laserjet-pro-m283fdw",
@@ -52,6 +57,7 @@ const scrapedPrinters = [
     original_price: 549.0,
     image: "/hp_color_laserjet.png",
     in_stock: true,
+    link: "https://www.hp.com/us-en/shop/pdp/hp-color-laserjet-pro-m283fdw",
   },
 ];
 
@@ -143,6 +149,10 @@ function PrinterCard({ product }) {
     addToWishlist(product);
     setInWishlist(true);
     setQuantity(1);
+    // Redirect to official website
+    if (product.link) {
+      window.location.href = product.link;
+    }
   };
 
   const handleIncrease = () => {
@@ -214,38 +224,14 @@ function PrinterCard({ product }) {
           }
         </div>
 
-        {/* Wishlist Button  OR  Quantity Selector */}
-        {
-          !inWishlist ? (
-            <button
-              style={{ backgroundColor: "var(--bg-color)" }}
-              onClick={handleAdd}
-              className="w-full h-12 rounded-lg hover:opacity-90 text-white text-sm font-medium transition-colors duration-200 cursor-pointer "
-            >
-              Add to Wishlist
-            </button>
-          ) : (
-            <div className="flex items-center gap-2 w-full" >
-              <button
-                style={{ backgroundColor: "var(--bg-color)" }}
-                onClick={handleDecrease}
-                className="flex-[0.8] h-11 rounded-lg hover:opacity-90 text-white text-xl font-bold flex items-center justify-center transition-colors duration-200 cursor-pointer"
-              >
-                −
-              </button>
-              < div className="flex-1 h-11 flex items-center justify-center text-sm font-semibold text-gray-800 border border-gray-200 rounded-lg bg-white select-none" >
-                {String(quantity).padStart(2, "0")}
-              </div>
-              < button
-                style={{ backgroundColor: "var(--bg-color)" }}
-                onClick={handleIncrease}
-                className="flex-[0.8] h-11 hover:opacity-90 rounded-lg text-white text-xl font-bold flex items-center justify-center transition-colors duration-200 cursor-pointer"
-              >
-                +
-              </button>
-            </div>
-          )
-        }
+        {/* Redirect Button */}
+        <button
+          style={{ backgroundColor: "var(--bg-color)" }}
+          onClick={handleAdd}
+          className="w-full h-12 rounded-lg hover:opacity-90 text-white text-sm font-medium transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md hover:-translate-y-0.5"
+        >
+          Add to Wishlist
+        </button>
       </div>
     </div>
   );

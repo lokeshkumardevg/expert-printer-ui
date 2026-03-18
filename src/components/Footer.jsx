@@ -111,9 +111,9 @@ function Footer({colorClass}) {
                 <h4 className="text-sm font-semibold mb-4">Contact Us</h4>
 
                 <ul className="space-y-2 text-sm">
-                  <li>(702) 555-0122</li>
-                  <li>help@techassistusa.com</li>
-                  <li>123 Tech Way, Suite 100</li>
+                  <li>+1 (844) PRINTER-HELP</li>
+                  <li>support@techforcall.ai</li>
+                  <li>24/7 Remote Technical Assistance</li>
                 </ul>
               </div>
 
@@ -222,7 +222,7 @@ function Footer({colorClass}) {
         <div className="w-full max-w-[1240px] h-px bg-black/20 my-10" />
 
         <p className="text-center text-xs mb-4 sm:mb-6">
-          © 2026 <span className="font-semibold">Expert Printer</span> All
+          © 2026 <span className="font-semibold">TechForCall</span> All
           Rights Reserved.
         </p>
       </div>

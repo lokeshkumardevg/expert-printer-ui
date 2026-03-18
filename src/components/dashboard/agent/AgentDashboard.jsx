@@ -20,7 +20,22 @@ import { API_ENABLED, AGENT_NAV, STATUS_STYLES } from "../../../lib/constants";
 function fmtDate(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
-  return `${d.toLocaleDateString()}\n${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+  return d.toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function fmtTime(iso) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function fmtGroupDate(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const today = new Date();
+  if (d.toDateString() === today.toDateString()) return "Today";
+  const yesterday = new Date(); yesterday.setDate(today.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return d.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
 // Map raw API stats object → stat card array
@@ -104,7 +119,17 @@ function Modal({ children, onClose }) {
 
 // ─── LIVE CHAT WINDOW ─────────────────────────────────────────────────────────
 function LiveChatWindow({ chat, onAccept, onResolve, onTransfer, currentUser }) {
-  const { messages, connected, chatStatus, sendMessage, transferToAdmin } = useChat({
+  const { 
+    messages, 
+    connected, 
+    chatStatus, 
+    otherIsTyping,
+    sendMessage, 
+    sendImage,
+    startTyping,
+    stopTyping,
+    transferToAdmin 
+  } = useChat({
     chatId: chat?.id,
     userId: currentUser?.id,
     role:   "agent",
@@ -117,12 +142,21 @@ function LiveChatWindow({ chat, onAccept, onResolve, onTransfer, currentUser }) 
     if (chatStatus === "active" && chat?.status === "waiting") onAccept?.(chat.id, false);
   }, [chatStatus]);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "auto" }); }, [messages]);
 
   const send = () => {
     if (!input.trim() || chat?.status === "waiting") return;
     sendMessage(input.trim());
     setInput("");
+    stopTyping();
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => sendImage(reader.result);
+    reader.readAsDataURL(file);
   };
 
   if (!chat) return (
@@ -172,62 +206,114 @@ function LiveChatWindow({ chat, onAccept, onResolve, onTransfer, currentUser }) 
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 bg-gray-50/20">
+      <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6 bg-gray-50/20">
         {messages.length === 0 && (
-          <div className="text-center text-xs text-gray-400 py-8">
-            {status === "waiting" ? "Accept this chat to start messaging." : "No messages yet."}
+          <div className="text-center text-xs text-gray-400 py-8 italic font-medium">
+            {status === "waiting" ? "Accept this chat to secure the connection." : "No messages yet. Waiting for customer input..."}
           </div>
         )}
-        {messages.map((m,idx) => (
-          <div key={m.id||idx}>
-            {m.from === "divider" && (
-              <div className="flex items-center gap-3 py-1">
-                <div className="flex-1 h-px bg-gray-200"/>
-                <span className="text-xs text-gray-400 whitespace-nowrap">{m.text}</span>
-                <div className="flex-1 h-px bg-gray-200"/>
+        {(() => {
+          const groups = [];
+          messages.forEach(m => {
+            const date = new Date(m.created_at || Date.now()).toDateString();
+            if (!groups.length || groups[groups.length - 1].date !== date) {
+              groups.push({ date, display: fmtGroupDate(m.created_at || Date.now()), items: [] });
+            }
+            groups[groups.length - 1].items.push(m);
+          });
+          
+          return groups.map(group => (
+            <div key={group.date} className="space-y-4">
+               <div className="flex items-center gap-3 py-2">
+                <div className="flex-1 h-px bg-gray-200/50"/>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-white px-2 py-0.5 rounded-full border border-gray-100">{group.display}</span>
+                <div className="flex-1 h-px bg-gray-200/50"/>
               </div>
-            )}
-            {m.from === "bot" && (
-              <div className="flex justify-end">
-                <div className="max-w-sm">
-                  <p className="text-xs text-gray-400 text-right mb-1.5">ChatBot</p>
-                  <div className="bg-white border border-gray-100 shadow-sm text-gray-700 text-sm rounded-2xl rounded-tr-sm px-4 py-3 leading-relaxed">{m.text}</div>
+
+              {group.items.map((m, idx) => (
+                <div key={m.id || idx}>
+                  {m.from === "divider" && (
+                     <div className="text-center py-2 px-3 bg-blue-50/30 rounded-lg border border-blue-100/30">
+                       <span className="text-[10px] text-blue-500 font-bold uppercase tracking-wide">System: {m.text}</span>
+                     </div>
+                  )}
+                  {m.from === "bot" && (
+                    <div className="flex justify-end gap-2 group/msg">
+                      <div className="max-w-[80%]">
+                        <p className="text-[10px] text-gray-400 text-right mb-1 font-medium italic">ChatBot · {fmtTime(m.created_at)}</p>
+                        <div className="bg-white border border-gray-100 shadow-sm text-gray-700 text-sm rounded-2xl rounded-tr-sm px-4 py-3 leading-relaxed group-hover/msg:shadow-md transition-shadow">
+                          {m.type === "image" ? (
+                            <img src={m.text} alt="Shared" className="max-w-full rounded-lg cursor-zoom-in" onClick={() => window.open(m.text)} />
+                          ) : m.text}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {m.from === "customer" && (
+                    <div className="flex flex-col items-start gap-1 group/msg px-1">
+                      <p className="text-[10px] text-blue-500 font-bold uppercase tracking-wider mb-1 px-1">{chat.customer} · {fmtTime(m.created_at)}</p>
+                      <div className="bg-blue-500 text-white text-sm rounded-2xl rounded-tl-sm px-4 py-3 max-w-[80%] shadow-sm group-hover/msg:shadow-md transition-shadow">
+                        {m.type === "image" ? (
+                          <img src={m.text} alt="Shared" className="max-w-full rounded-lg cursor-zoom-in" onClick={() => window.open(m.text)} />
+                        ) : m.text}
+                      </div>
+                    </div>
+                  )}
+                  {(m.from === "agent" || m.from === "admin") && (
+                    <div className="flex justify-end gap-2 group/msg">
+                      <div className="max-w-[80%]">
+                        <p className="text-[10px] text-gray-400 text-right font-medium uppercase tracking-wider mb-1 px-1">You · {fmtTime(m.created_at)}</p>
+                        <div className="bg-white border border-gray-100 shadow-sm text-gray-700 text-sm rounded-2xl rounded-tr-sm px-4 py-3 group-hover/msg:shadow-md transition-shadow">
+                          {m.type === "image" ? (
+                            <img src={m.text} alt="Shared" className="max-w-full rounded-lg cursor-zoom-in" onClick={() => window.open(m.text)} />
+                          ) : m.text}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
-            {m.from === "customer" && (
-              <div className="flex flex-col items-start">
-                <p className="text-xs text-blue-500 font-semibold mb-1.5">{chat.customer}</p>
-                <div className="bg-blue-500 text-white text-sm rounded-2xl rounded-tl-sm px-4 py-3 max-w-sm leading-relaxed">{m.text}</div>
-              </div>
-            )}
-            {(m.from === "agent" || m.from === "admin") && (
-              <div className="flex justify-end">
-                <div className="max-w-sm">
-                  <p className="text-xs text-gray-400 text-right mb-1.5">You</p>
-                  <div className="bg-white border border-gray-100 shadow-sm text-gray-700 text-sm rounded-2xl rounded-tr-sm px-4 py-3 leading-relaxed">{m.text}</div>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
+              ))}
+            </div>
+          ));
+        })()}
         <div ref={bottomRef}/>
       </div>
 
       {/* Input */}
-      <div className="px-6 py-4 border-t border-gray-100 bg-white">
-        <div className={`flex items-center gap-3 border rounded-2xl px-4 py-3 transition-all ${
-          status === "waiting" ? "border-gray-100 bg-gray-50" : "border-gray-200 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100"
-        }`}>
-          <input value={input} onChange={e=>setInput(e.target.value)}
-            onKeyDown={e=>e.key==="Enter"&&send()}
+      <div className="p-4 border-t border-gray-100 bg-white">
+        {otherIsTyping && (
+          <div className="flex items-center gap-2 mb-2 px-1">
+             <div className="flex gap-1">
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" />
+             </div>
+             <span className="text-[10px] text-blue-500 font-medium">{chat.customer} is typing...</span>
+          </div>
+        )}
+        <div className="flex items-center gap-3">
+          <label className="p-2.5 rounded-xl bg-gray-50 text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-all cursor-pointer group">
+            <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
+            <span className="text-xl group-hover:scale-110 transition-transform">📎</span>
+          </label>
+          <input
+            value={input}
+            onChange={(e)=>{
+              setInput(e.target.value);
+              startTyping();
+            }}
+            onBlur={stopTyping}
+            placeholder={status === "waiting" ? "Accept to message..." : "Type a help message..."}
             disabled={status === "waiting"}
-            className="flex-1 text-sm text-gray-700 outline-none bg-transparent placeholder:text-gray-400 disabled:cursor-not-allowed"
-            placeholder={status === "waiting" ? "Accept the chat to start messaging…" : "Type message here…"}
+            className="flex-1 bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all disabled:opacity-50"
+            onKeyDown={(e)=>e.key==="Enter"&&send()}
           />
-          <button onClick={send} disabled={status === "waiting" || !input.trim()}
-            className="text-blue-500 hover:text-blue-600 disabled:text-gray-300 transition-colors">
-            <Icon name="send" cls="w-5 h-5"/>
+          <button
+            onClick={send}
+            disabled={status === "waiting"}
+            className="bg-blue-500 text-white px-5 py-3 rounded-xl text-sm font-semibold hover:bg-blue-600 transition-colors shadow-sm shadow-blue-500/20 active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100"
+          >
+            Send
           </button>
         </div>
       </div>
@@ -248,14 +334,23 @@ function LiveChatsView({ user }) {
     enabled: true,
   });
 
-  // Merge WS new chats into list (avoid duplicates)
+  // Merge WS status updates/new chats into list
   useEffect(() => {
-    pendingChats.forEach(pc => {
+    if (pendingChats.length) {
       setChats(prev => {
-        if (prev.find(c => c.id === pc.id)) return prev;
-        return [...prev, { ...pc, status: "waiting" }];
+        const next = [...prev];
+        pendingChats.forEach(pc => {
+          const idx = next.findIndex(c => (c.id || c._id) === (pc.id || pc._id));
+          if (idx === -1) {
+            next.unshift({ ...pc, status: pc.status || "waiting" });
+          } else {
+            // Update status/agent if changed externally
+            next[idx] = { ...next[idx], ...pc };
+          }
+        });
+        return next;
       });
-    });
+    }
   }, [pendingChats]);
 
   const pollingRef = useRef(null);
@@ -273,8 +368,7 @@ function LiveChatsView({ user }) {
 
   useEffect(() => {
     fetchChats();
-    pollingRef.current = setInterval(fetchChats, 8000);
-    return () => clearInterval(pollingRef.current);
+    // Removed polling to prevent UI glitching
   }, [fetchChats]);
 
   const handleAccept = async (chatId, showModal) => {
@@ -322,7 +416,7 @@ function LiveChatsView({ user }) {
             </span>
           )}
         </div>
-        <div className="overflow-y-auto flex-1 divide-y divide-gray-100">
+        <div className="overflow-y-auto flex-1 h-full scroll-smooth">
           {loading
             ? [1,2,3].map(i=>(
                 <div key={i} className="px-5 py-4 space-y-2">
@@ -330,27 +424,48 @@ function LiveChatsView({ user }) {
                 </div>
               ))
             : chats.length === 0
-              ? <div className="px-5 py-10 text-center text-xs text-gray-400">No chats yet. Waiting for customers…</div>
-              : chats.map(c => (
-                  <div key={c.id} onClick={() => setSelected(c)}
-                    className={`px-5 py-4 cursor-pointer hover:bg-gray-50 transition-colors ${sel?.id === c.id ? "bg-blue-50/40" : ""}`}>
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-semibold text-gray-900 truncate">{c.customer}</p>
-                      {c.status === "waiting" ? (
-                        <button onClick={e=>{e.stopPropagation();handleAccept(c.id,true);}}
-                          className="bg-blue-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-blue-600 transition-colors">
-                          Accept
-                        </button>
-                      ) : (
-                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${listPill[c.status]}`}>
-                          {c.status === "active" ? "Active" : "Resolved"}
-                        </span>
-                      )}
+              ? <div className="px-5 py-10 text-center text-xs text-gray-400 italic">No assigned chats. Waiting for customers…</div>
+              : (() => {
+                  const sorted = [...chats].sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+                  const groups = [];
+                  sorted.forEach(c => {
+                    const date = new Date(c.created_at || Date.now()).toDateString();
+                    if (!groups.length || groups[groups.length - 1].date !== date) {
+                      groups.push({ date, display: fmtGroupDate(c.created_at || Date.now()), items: [] });
+                    }
+                    groups[groups.length - 1].items.push(c);
+                  });
+                  
+                  return groups.map(group => (
+                    <div key={group.date}>
+                      <div className="px-5 py-1.5 bg-gray-50/80 border-y border-gray-100/50 sticky top-0 z-10 backdrop-blur-sm">
+                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{group.display}</span>
+                      </div>
+                      {group.items.map(c => (
+                        <div key={c.id || c._id} onClick={() => setSelected(c)}
+                          className={`px-5 py-4 cursor-pointer hover:bg-blue-50/30 transition-colors border-b border-gray-50 last:border-0 ${sel?.id === c.id ? "bg-blue-50/60 ring-1 ring-inset ring-blue-100 shadow-sm" : ""}`}>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <p className="text-sm font-bold text-gray-900 truncate pr-2">{c.customer}</p>
+                            {c.status === "waiting" ? (
+                              <button onClick={e=>{e.stopPropagation();handleAccept(c.id,true);}}
+                                className="bg-blue-500 text-white text-[10px] font-bold uppercase tracking-tight px-2 py-1 rounded-md hover:bg-blue-600 transition-colors shadow-sm">
+                                Accept
+                              </button>
+                            ) : (
+                              <span className={`text-[9px] font-bold uppercase tracking-tighter px-1.5 py-0.5 rounded-md ${listPill[c.status]}`}>
+                                {c.status === "active" ? "Active" : "Resolved"}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <p className="text-[10px] text-gray-500 truncate">{c.printer||"Genric Printer"}</p>
+                            <span className="text-[9px] text-gray-400">{fmtTime(c.created_at)}</span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <p className="text-xs text-gray-500 truncate">{c.printer||"—"}</p>
-                    <p className="text-xs text-gray-400 truncate">{c.issue||"—"}</p>
-                  </div>
-                ))
+                  ));
+                })()
           }
         </div>
       </div>

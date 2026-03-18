@@ -16,6 +16,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { API_BASE } from "../lib/constants";
+import { useChat } from "../hooks/useChat";
 
 // ─── Stable per-tab user ID ──────────────────────────────────────────────────
 const USER_ID = (() => {
@@ -97,6 +98,21 @@ const PrinterBot = ({ isMinimized, setIsMinimized }) => {
   const [liveChatId,      setLiveChatId]      = useState(null);
   const [escalationError, setEscalationError] = useState("");
 
+  const { 
+    messages: liveMessages, 
+    sendMessage: sendLiveMessage,
+    queuePosition,
+    onlineAgents,
+    otherIsTyping,
+    startTyping,
+    stopTyping,
+    sendImage
+  } = useChat({
+    chatId: liveChatId,
+    userId: USER_ID,
+    role: "customer"
+  });
+
   const collected = useRef({
     issue: "", brand: "", model: "",
     name: "", email: "", phone: "", location: "",
@@ -106,8 +122,11 @@ const PrinterBot = ({ isMinimized, setIsMinimized }) => {
 
   // ── Scroll to bottom ─────────────────────────────────────────────────────────
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, step]);
+    // requestAnimationFrame ensures the DOM has updated before we scroll
+    const scroll = () => chatEndRef.current?.scrollIntoView({ behavior: "auto" });
+    const timer = setTimeout(scroll, 50);
+    return () => clearTimeout(timer);
+  }, [messages, liveMessages, step]);
 
   // ── Init welcome message ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -207,7 +226,18 @@ const PrinterBot = ({ isMinimized, setIsMinimized }) => {
     } else if (step === "location") {
       collected.current.location = trimmed;
       setTimeout(() => { setStep("confirm"); }, 400);
+    } else if (step === "live") {
+      sendLiveMessage(trimmed);
+      stopTyping();
     }
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => sendImage(reader.result);
+    reader.readAsDataURL(file);
   };
 
   // ── Escalate to backend ───────────────────────────────────────────────────────
@@ -275,11 +305,12 @@ const PrinterBot = ({ isMinimized, setIsMinimized }) => {
       email:    "Enter your email address...",
       phone:    "Enter your phone number...",
       location: "Enter your city or country...",
+      live:     "Ask your question to the technician...",
     };
     return map[step] || "";
   };
 
-  const showInput = INPUT_STEPS.includes(step);
+  const showInput = INPUT_STEPS.includes(step) || step === "live";
   const modelOptions = MODELS_BY_BRAND[collected.current.brand] || ["Other"];
 
   /* ════════════════════════════════════════════════════════════════════════════
@@ -350,16 +381,28 @@ const PrinterBot = ({ isMinimized, setIsMinimized }) => {
               <motion.div
                 initial={{ opacity: 0, y: -8 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mt-2 flex items-center gap-3 bg-green-50 px-3 py-2 rounded-xl border border-green-200 flex-shrink-0"
+                className={`mt-2 flex items-center gap-3 px-3 py-2 rounded-xl border flex-shrink-0 ${
+                  onlineAgents > 0 ? "bg-green-50 border-green-200" : "bg-amber-50 border-amber-200"
+                }`}
               >
-                <div className="w-9 h-9 rounded-full bg-green-500 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">TS</div>
+                <div className={`w-9 h-9 rounded-full text-white flex items-center justify-center font-bold text-sm flex-shrink-0 ${
+                  onlineAgents > 0 ? "bg-green-500" : "bg-amber-500"
+                }`}>TS</div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-green-700">Certified Technician</p>
-                  <p className="text-xs text-gray-500">Connected · Agent joining shortly</p>
+                  <p className={`text-[13px] font-semibold ${onlineAgents > 0 ? "text-green-700" : "text-amber-700"}`}>
+                    {onlineAgents > 0 ? "Certified Technician" : "Support Queue"}
+                  </p>
+                  <p className="text-[11px] text-gray-500">
+                    {queuePosition > 0 
+                      ? `Position ${queuePosition} in queue · Agents: ${onlineAgents}`
+                      : onlineAgents > 0 ? "Connected · Joining shortly" : "Waiting for next available agent"}
+                  </p>
                 </div>
-                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-mono flex-shrink-0">
-                  #{liveChatId.slice(-6)}
-                </span>
+                {onlineAgents > 0 && (
+                  <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-mono flex-shrink-0">
+                    #{liveChatId.slice(-6)}
+                  </span>
+                )}
               </motion.div>
             )}
 
@@ -419,7 +462,7 @@ const PrinterBot = ({ isMinimized, setIsMinimized }) => {
               <AnimatePresence initial={false}>
 
                 {/* Chat bubbles */}
-                {messages.map((msg, i) => (
+                {(step === "live" ? liveMessages.map(m => ({ type: m.from === "customer" ? "user" : "bot", text: m.text, msgType: m.type })) : messages).map((msg, i) => (
                   <motion.div
                     key={i}
                     initial={{ opacity: 0, x: msg.type === "user" ? 30 : -30, scale: 0.95 }}
@@ -431,12 +474,33 @@ const PrinterBot = ({ isMinimized, setIsMinimized }) => {
                       {msg.type === "user" ? "You" : step === "live" ? "Assistant" : "Atlas"}
                     </span>
                     <div className={`max-w-[85%] px-4 py-2 rounded-xl text-sm leading-relaxed ${
-                      msg.type === "user" ? "bg-white text-black" : "bg-[#286CAC] text-white"
+                      msg.type === "user" ? "bg-white text-black text-right" : "bg-[#286CAC] text-white"
                     }`}>
-                      {msg.text}
+                      {msg.msgType === "image" ? (
+                        <img src={msg.text} alt="Shared" className="max-w-full rounded-lg cursor-zoom-in" onClick={() => window.open(msg.text)} />
+                      ) : msg.text}
                     </div>
                   </motion.div>
                 ))}
+
+                {/* Other side typing indicator */}
+                {otherIsTyping && (
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="flex flex-col items-start"
+                  >
+                    <span className="text-xs opacity-60 mb-0.5">Assistant</span>
+                    <div className="px-3 py-1.5 rounded-xl bg-[#286CAC]/10 border border-[#286CAC]/20 flex gap-1 items-center">
+                      <div className="flex gap-1">
+                        {[0, 0.2, 0.4].map((d) => (
+                           <motion.div key={d} animate={{ y: [0, -3, 0] }} transition={{ repeat: Infinity, duration: 0.6, delay: d }} className="w-1.5 h-1.5 bg-[#286CAC] rounded-full" />
+                        ))}
+                      </div>
+                      <span className="text-[10px] text-[#286CAC] ml-1 font-medium">Typing...</span>
+                    </div>
+                  </motion.div>
+                )}
 
                 {/* Typing indicator */}
                 {isTyping && (
@@ -539,13 +603,28 @@ const PrinterBot = ({ isMinimized, setIsMinimized }) => {
                 }`}>
                   <input
                     value={input}
-                    onChange={(e) => { setInput(e.target.value); if (inputError) setInputError(""); }}
+                    onChange={(e) => { 
+                      setInput(e.target.value); 
+                      if (inputError) setInputError(""); 
+                      if (step === "live") startTyping();
+                    }}
                     placeholder={getPlaceholder()}
                     className="flex-1 bg-transparent outline-none text-sm min-w-0"
-                    onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") sendMessage();
+                    }}
+                    onBlur={() => {
+                      if (step === "live") stopTyping();
+                    }}
                     type={step === "email" ? "email" : step === "phone" ? "tel" : "text"}
                     autoFocus
                   />
+                  {step === "live" && (
+                    <label className="cursor-pointer flex items-center justify-center text-gray-400 hover:text-[#286CAC] transition-colors">
+                      <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
+                      <span className="text-xl">📎</span>
+                    </label>
+                  )}
                   <button
                     onClick={sendMessage}
                     className="w-8 h-8 flex-shrink-0 bg-[#5695D0] rounded-full text-white flex items-center justify-center hover:bg-[#286CAC] transition-colors"

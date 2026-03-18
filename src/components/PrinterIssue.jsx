@@ -49,14 +49,14 @@ const PrinterIssue = () => {
             max-w-full
           "
         >
-          At Printer Expert, we hold the court in the competitive marketing world with our AI-Powered Printer Help Desk that acts as your personal printer support assistant for multiple leading printer brands and models. We provide professional troubleshooting and maintenance services for popular brands such as HP, Canon, Epson, Brother, Ricoh, Xerox, Samsung, Panasonic, Fujitsu, Kyocera, Konica Minolta, Tally, and many more.
+          At TechForCall, we provide premium, AI-powered printer diagnostic services that act as your personal tech hub. Our certified specialists provide 24/7 remote support for all leading brands including HP, Canon, Epson, Brother, Ricoh, Xerox, and many more.
 
-From driver updates and connectivity issues to paper jams and performance errors, all you need to do is contact us and our experts will get back to yoy. Or you can just tell our own 
-{" "}
+          From wireless setup and driver installation to resolving 'Printer Offline' errors and complex hardware diagnostics, our team is ready to help at a moment's notice. You can contact us directly or interact with our intelligent
+          {" "}
           <span className="font-semibold text-black">
             “AI Bot Help Desk”
           </span>{" "}
-          that we have customized and trained to behave as your personal online printer support hub.
+          to get step-by-step guidance for any printer model world-wide.
         </p>
 
         {/* Bottom Line */}

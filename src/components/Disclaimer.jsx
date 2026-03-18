@@ -57,16 +57,16 @@ export default function DisclaimerModal({ isOpen, onClose }) {
             1. Company Status and Independence
           </h2>
           <p className="text-gray-600 text-sm leading-relaxed">
-            TechAssist USA is an independent third-party provider of online
+            TechForCall is an independent third-party provider of online
             systems assistance and technical support services.
           </p>
           <p className="text-gray-600 text-sm leading-relaxed mt-2">
             While we are an authorized reseller partner of Hewlett-Packard (HP)
-            and employ CompTIA Certified specialists, our services remain independent.
+            and employ certified technical specialists, our services remain independent.
           </p>
           <p className="text-gray-600 text-sm leading-relaxed mt-2">
-            We are not affiliated with, endorsed by, or sponsored by Microsoft
-            or any other brand unless explicitly stated.
+            We are not affiliated with, endorsed by, or sponsored by Microsoft,
+            Canon, Epson, or any other brand unless explicitly stated.
           </p>
         </section>
 
@@ -81,7 +81,7 @@ export default function DisclaimerModal({ isOpen, onClose }) {
         <section>
           <h2 className="font-semibold mb-2">3. Limitation of Liability</h2>
           <p className="text-gray-600 text-sm leading-relaxed">
-            Services are provided without warranties of any kind. TechAssist USA
+            Services are provided without warranties of any kind. TechForCall
             shall not be liable for indirect or consequential damages arising
             from the use of our services.
           </p>

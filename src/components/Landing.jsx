@@ -36,7 +36,7 @@ const PrinterSupportHero = () => {
     if (!validateForm()) return;
     try {
       setLoading(true);
-      const response = await fetch("https://your-api-endpoint.com/submit", {
+      const response = await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
@@ -75,11 +75,11 @@ const PrinterSupportHero = () => {
             {/* ── LEFT: Text content ── */}
             <div className="text-white space-y-5 sm:space-y-6">
               <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold leading-tight">
-                Expert Systems Assistance & Authorized Hardware Solutions.
+                24/7 Expert Printer Support & Technical Diagnostics.
               </h1>
 
               <p className="text-sm sm:text-base lg:text-lg text-gray-200 leading-relaxed">
-                Patient, live online guidance for seniors and home offices. We help you stay connected without the frustration.
+                Struggling with a printer that won't connect? Our certified technicians provide instant remote assistance for driver setup, wireless networking, and hardware troubleshooting.
               </p>
               <NavLink to="/support">
               <button
@@ -113,12 +113,11 @@ const PrinterSupportHero = () => {
             <div className="w-full">
               <div className="bg-white rounded-3xl shadow-xl p-5 sm:p-7 lg:p-9 transition-all duration-300 ease-out hover:scale-[1.02] hover:shadow-2xl">
                 <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-1.5 sm:mb-2">
-                  Having trouble with your printer?
+                  Instant Support Request
                 </h2>
 
                 <p className="text-xs sm:text-sm lg:text-base text-gray-600 mb-4 sm:mb-6 leading-relaxed">
-                  Please provide details about the issue you are experiencing.
-                  Our technical support team will contact you promptly.
+                  Enter your details below to connect with a certified printer specialist for immediate troubleshooting.
                 </p>
 
                 <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">

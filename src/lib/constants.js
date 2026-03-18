@@ -2,7 +2,7 @@
 // constants.js — all static config, fallback data, nav items per role
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const API_BASE    = "http://127.0.0.1:8000";
+export const API_BASE    = "http://localhost:8000";
 export const API_ENABLED = true;
 
 export const ROLES = { ADMIN: "admin", AGENT: "agent" };
@@ -20,6 +20,7 @@ export const ADMIN_NAV = [
   { label: "Leads",           icon: "list"  },
   { label: "Website Content", icon: "globe" },
   { label: "Agents",          icon: "users" },
+  { label: "Blogs",           icon: "book"  },
 ];
 
 export const AGENT_NAV = [

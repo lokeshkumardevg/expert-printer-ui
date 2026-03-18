@@ -3,25 +3,25 @@ import { Link, NavLink } from "react-router-dom";
 const services = [
     {
         title: "On Site Repair",
-        description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do.",
+        description: "Professional on-site printer maintenance and hardware repair services. We dispatch experts to resolve complex mechanical issues.",
         image: "/onsite.png",
         showPin: true,
     },
     {
         title: "Printer Setup & Connectivity",
-        description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do.",
+        description: "Seamless wireless setup and network configuration. We ensure your devices communicate perfectly, resolving offline errors.",
         image: "printer_setup.png",
         showPin: false,
     },
     {
         title: "System Speed & Health",
-        description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do.",
+        description: "Optimizing spooler settings and clearing print queues. We remove stale drivers and software conflicts for peak performance.",
         image: "system_speed.png",
         showPin: false,
     },
     {
         title: "Security & Antivirus",
-        description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do.",
+        description: "Protecting network-enabled printers from unauthorized access. We implement secure firmware updates to keep your data safe.",
         image: "/s&a.png",
         showPin: false,
     },
@@ -121,8 +121,7 @@ export default function ServicesSection({colorClass}) {
                 <div className="text-center mb-12">
                     <h2 className="text-4xl font-bold text-gray-900 mb-4"> {displayText} < span className="animate-pulse" >| </span></h2>
                     <p className="text-gray-500 text-base max-w-lg mx-auto leading-relaxed">
-                        Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod
-                        tempor incididunt ut labore et dolore magna aliqua.
+                        Comprehensive technical support for all your printing needs. Our certified experts provide 24/7 assistance to keep your home office running smoothly.
                     </p>
                 </div>
 
